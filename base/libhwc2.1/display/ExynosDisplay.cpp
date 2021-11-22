@@ -2466,15 +2466,20 @@ int32_t ExynosDisplay::getReleaseFences(
     } else {
         uint32_t deviceLayerNum = 0;
         for (size_t i = 0; i < mLayers.size(); i++) {
-            outLayers[deviceLayerNum] = (hwc2_layer_t)mLayers[i];
-            outFences[deviceLayerNum] = mLayers[i]->mReleaseFence;
-            /*
-             * layer's release fence will be closed by caller of this function.
-             * HWC should not close this fence after this function is returned.
-             */
-            mLayers[i]->mReleaseFence = -1;
+            if (mLayers[i]->mReleaseFence >= 0) {
+                if (deviceLayerNum < *outNumElements) {
+                    // transfer fence ownership to the caller
+                    outLayers[deviceLayerNum] = (hwc2_layer_t)mLayers[i];
+                    outFences[deviceLayerNum] = mLayers[i]->mReleaseFence;
+                    mLayers[i]->mReleaseFence = -1;
 
-            DISPLAY_LOGD(eDebugHWC, "[%zu] layer deviceLayerNum(%d), release fence: %d", i, deviceLayerNum, outFences[deviceLayerNum]);
+                    DISPLAY_LOGD(eDebugHWC, "[%zu] layer deviceLayerNum(%d), release fence: %d", i, deviceLayerNum, outFences[deviceLayerNum]);
+                } else {
+                    // *outNumElements is not from the first pass call.
+                    DISPLAY_LOGE("%s: outNumElements %d too small", __func__, *outNumElements);
+                    return HWC2_ERROR_BAD_PARAMETER;
+                }
+            }
             deviceLayerNum++;
         }
     }
