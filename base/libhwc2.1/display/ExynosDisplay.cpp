@@ -2458,13 +2458,15 @@ int32_t ExynosDisplay::getDozeSupport(
 int32_t ExynosDisplay::getReleaseFences(
     uint32_t *outNumElements,
     hwc2_layer_t *outLayers, int32_t *outFences) {
+
+    if (outNumElements == NULL) {
+        return HWC2_ERROR_BAD_PARAMETER;
+    }
+
     Mutex::Autolock lock(mDisplayMutex);
-    if (outLayers == NULL || outFences == NULL) {
-        uint32_t deviceLayerNum = 0;
-        deviceLayerNum = mLayers.size();
-        *outNumElements = deviceLayerNum;
-    } else {
-        uint32_t deviceLayerNum = 0;
+    uint32_t deviceLayerNum = 0;
+    if (outLayers != NULL && outFences != NULL) {
+        // second pass call
         for (size_t i = 0; i < mLayers.size(); i++) {
             if (mLayers[i]->mReleaseFence >= 0) {
                 if (deviceLayerNum < *outNumElements) {
@@ -2473,16 +2475,26 @@ int32_t ExynosDisplay::getReleaseFences(
                     outFences[deviceLayerNum] = mLayers[i]->mReleaseFence;
                     mLayers[i]->mReleaseFence = -1;
 
-                    DISPLAY_LOGD(eDebugHWC, "[%zu] layer deviceLayerNum(%d), release fence: %d", i, deviceLayerNum, outFences[deviceLayerNum]);
+                    DISPLAY_LOGD(eDebugHWC, "[%zu] layer deviceLayerNum(%d), release fence: %d", i,
+                                 deviceLayerNum, outFences[deviceLayerNum]);
                 } else {
                     // *outNumElements is not from the first pass call.
                     DISPLAY_LOGE("%s: outNumElements %d too small", __func__, *outNumElements);
                     return HWC2_ERROR_BAD_PARAMETER;
                 }
+                deviceLayerNum++;
             }
-            deviceLayerNum++;
+        }
+    } else {
+        // first pass call
+        for (size_t i = 0; i < mLayers.size(); i++) {
+            if (mLayers[i]->mReleaseFence >= 0) {
+                deviceLayerNum++;
+            }
         }
     }
+    *outNumElements = deviceLayerNum;
+
     return HWC2_ERROR_NONE;
 }
 
